@@ -1,14 +1,37 @@
-<!DOCTYPE html>
-<html lang="en">
+<!-- <!DOCTYPE html>
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Index del achoyverse</title>
+<title>AR.js A-Frame Location-based</title>
+<script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
+<script type='text/javascript' src='https://raw.githack.com/AR-js-org/AR.js/master/three.js/build/ar-threex-location-only.js'></script>
+<script type='text/javascript' src='https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js'></script>
 </head>
 <body>
-    <a href="oz-maze.html">Maguito de Oz Laberinto</a>
-    <br>
-    <a href="realidad-aumentada.html">Realidad aumentada</a>
+<a-scene vr-mode-ui='enabled: false' arjs='sourceType: webcam; videoTexture: true; debugUIEnabled: false' renderer='antialias: true; alpha: true'>
+    <a-camera gps-new-camera='gpsMinDistance: 5'></a-camera>
+
+    <a-entity material='color: blue' geometry='primitive: box' gps-new-entity-place="latitude: 24.0942665; longitude: -110.3251965" scale="10 10 10">
+
+    </a-entity>
+</a-scene>
+</body>
+</html> -->
+
+<!DOCTYPE html>
+<html>
+<head>
+<title>AR.js A-Frame Location-based</title>
+<script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
+<script type='text/javascript' src='https://raw.githack.com/AR-js-org/AR.js/master/three.js/build/ar-threex-location-only.js'></script>
+<script type='text/javascript' src='https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js'></script>
+</head>
+
+<body>
+    <a-scene embedded loading-screen='enabled: false;' arjs='sourceType: webcam; videoTexture: true; debugUIEnabled: false;' renderer='antialias: true; alpha: true'>
+            <a-image src="assets/asset.jpeg" look-at="[gps-camera]" scale="1 1 1" gps-entity-place="latitude: 24.0942665; longitude: -110.3251965;"
+            ></a-image>
+
+        <a-camera gps-camera rotation-reader></a-camera>
+    </a-scene>
 </body>
 </html>
