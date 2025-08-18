@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laberinto El Mago de Oz</title>
+    <style type="text/css">
+        body{
+            background-color: rgb(40,40,40);
+        }
+        canvas{
+            background-color: rgb(40,40,40);
+            margin: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="canvasChido" width="850" height="875">
+        Tu navegador no soporta Canvas pero aquí hay un Canvas bonito
+    </canvas>
+
+    <script type="text/javascript">
+        var canvas = null;
+        var ctx = null;
+
+        var intervalo;
+        var minutos = 0;
+        var minutosStr = "00";
+        var segundos = 0;
+        var segundosStr = "00";
+        var decimas = 0;
+        var decimasStr = "00";
+
+        var desfaseX=25;
+        var desfaseY=45;
+        
+        var pause = true;
+        var gameOver = false;
+        
+        var personaje = Math.floor(Math.random() * 5);
+        var frasesGameOver = ["Dorothy, regresaste a Kansas porque no hay lugar como el hogar",
+                              "Espantapájaros, por saber Pitágoras ganaste un diploma en Piensología",
+                              "Hombre de Hojalata, tienes más corazón que una filan... persona generosa",
+                              "León cobarde, bienvenido a la Legión de los Valientes",
+                              "Bruja mala del Oeste, con las zapatillas de rubí dominarás la tierra de Oz"];
+        var player1 = null;
+        var finish = null;
+        var direccion = null;
+        var velMov = 2;
+
+        var paredes = [];
+
+        var bg_img = new Image();
+        var player_icon = new Image();
+        var finish_icon = new Image();
+        var bgmusic = new Audio();
+        var winSFX = new Audio();
+        
+        
+        function start(){
+            canvas = document.getElementById("canvasChido");
+            ctx = canvas.getContext("2d");
+
+            player1 = new Cuadro(8, 8, "objeto", null, null);
+            finish = new Cuadro(768, 768, "objeto", null, null);
+            crearParedes();
+            
+            bg_img.src = "img/bg_800.png";
+            player_icon.src = "img/icon_"+personaje+"_24.png";
+            finish_icon.src = "img/finish_"+personaje+"_24.png";
+            bgmusic.src = 'snd/song.wav';
+            winSFX.src = 'snd/win.mp3';
+            winSFX.volume = 0.2;
+            bgmusic.loop = true;
+
+            paintFrame();
+        }
+
+        window.requestAnimationFrame = (function () {
+        return window.requestAnimationFrame ||
+            window.webkitRequestAnimationFrame ||
+            window.mozRequestAnimationFrame ||
+            function (callback) {
+                window.setTimeout(callback, 17);
+            };
+        }());
+
+        document.addEventListener("load", start(), false);
+
+        function paintFrame(){
+            window.requestAnimationFrame(paintFrame);
+            ctx.fillStyle = "rgb(40,40,40)";
+            ctx.fillRect(0, 0, 10000,10000);
+
+            ctx.font = "30px Calibri";
+            ctx.fillStyle = "rgb(255,255,255,1)";
+            ctx.fillText("Tiempo: "+minutosStr+":"+segundosStr+":"+decimasStr,desfaseX,32);
+            
+            //Dibujar iconos y paredes
+            ctx.drawImage(bg_img, desfaseX,desfaseY);
+            ctx.drawImage(player_icon, player1.x, player1.y);
+            ctx.drawImage(finish_icon, finish.x, finish.y);
+            for (let i = 0; i < paredes.length; i++) {
+                paredes[i].pintar(ctx);
+            }
+
+            //Game Over = Pantalla de felicidades
+            if(gameOver){
+                ctx.fillStyle = "rgba(0,0,0,0.6)";
+                ctx.fillRect(0,0,2000,2000);
+                
+                ctx.fillStyle = "white";
+                ctx.font = "100px Cambria";
+                ctx.fillText("¡FELICIDADES!", 100,200);
+
+                ctx.font = "23px Cambria";
+                ctx.fillText(frasesGameOver[personaje], 75,250);
+                ctx.font = "20px Cambria";
+                ctx.fillText("Presiona ESPACIO para pausar la música", 75,350);
+                ctx.fillText("Refresca la página para volver a jugar", 75,400);
+            }
+            //Pausa = Pantalla de pausa e instrucciones
+            else if(pause){
+                ctx.fillStyle = "rgba(0,0,0,0.6)";
+                ctx.fillRect(0,0,2000,2000);
+                
+                ctx.font = "130px Cambria";
+                ctx.fillStyle = "white";
+                ctx.fillText("P A U S A", 75,400);
+                ctx.font = "30px Cambria";
+                ctx.fillText("Presiona ESPACIO para reanudar la partida", 75,500);
+                ctx.font = "20px Cambria";
+                ctx.fillText("Mueve tu personaje con WASD o las flechas", 75,550);
+                ctx.fillText("Cruza el laberinto del camino amarillo y llega a eso que tanto deseas", 75,600);
+            }
+            //Significa que el juego está corriendo
+            else{
+                update();
+            }
+        }
+
+        function update(){
+            switch (direccion) {
+                case "derecha":
+                    if(player1.x!=776+desfaseX)
+                        player1.x+=velMov;
+                    break;
+                case "izquierda":
+                    if(player1.x!=0)
+                        player1.x-=velMov;
+                    break;
+                case "arriba":
+                    if(player1.y!=0)
+                        player1.y-=velMov;
+                    break;
+                case "abajo":
+                    if(player1.y!=776+desfaseY)
+                        player1.y+=velMov;
+                    break;
+                default:
+                    break;
+            }
+            //Checar si llegó a la meta
+            if(player1.se_tocan(finish)){
+                gameOver = true;
+                pausarTiempo();
+                winSFX.play();
+                bgmusic.volume = 0.3;
+            }
+            //Checar colision con paredes
+            for (let i = 0; i < paredes.length; i++) {
+                if(player1.se_tocan(paredes[i])){
+                    switch (direccion) {
+                        case "derecha":
+                            player1.x-=velMov;
+                            break;
+                        case "izquierda":
+                            player1.x+=velMov;
+                            break;
+                        case "arriba":
+                            player1.y+=velMov;
+                            break;
+                        case "abajo":
+                            player1.y-=velMov;
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+        }
+
+        function Cuadro(x, y, tipo, orient, largo){
+            this.tipo = tipo;
+            if(tipo == "objeto"){
+                this.x = x+desfaseX;
+                this.y = y+desfaseY;
+                this.w = 24;
+                this.h = 24;
+            }
+            else if(tipo == "pared"){
+                this.x =(x*40)+desfaseX;
+                this.y =(y*40)+desfaseY;
+                if(orient == "v"){
+                    this.w = 2;
+                    this.h = largo*40;
+                }
+                else if(orient == "h"){
+                    this.w = largo*40;
+                    this.h = 2;
+                }
+            }
+
+            this.se_tocan = function (target) { 
+                if(this.x < target.x + target.w &&
+                this.x + this.w > target.x && 
+                this.y < target.y + target.h && 
+                this.y + this.h > target.y){
+                    return true;
+                }
+            };
+
+            this.pintar = function(ctx){
+                ctx.fillStyle = "black";
+                ctx.strokeStyle = "black";
+                ctx.fillRect(this.x, this.y, this.w, this.h);
+                ctx.strokeRect(this.x, this.y, this.w, this.h);
+            }
+        }
+
+        document.addEventListener("keydown", function(e){
+            if(!pause){
+                if(e.key == "w" || e.key =="ArrowUp"){
+                    direccion = "arriba";
+                }
+                if(e.key == "s" || e.key =="ArrowDown"){
+                    direccion = "abajo";
+                }
+                if(e.key == "a" || e.key =="ArrowLeft"){
+                    direccion = "izquierda";
+                }
+                if(e.key == "d" || e.key =="ArrowRight"){
+                    direccion = "derecha";
+                }
+            }
+            if(e.key == " "){
+                if(pause){
+                    pause = false;
+                    bgmusic.play();
+                    if(!gameOver){
+                        empezarTiempo();
+                    }
+                }
+                else{
+                    pause = true;
+                    bgmusic.pause();
+                    pausarTiempo();
+                }
+                direccion = null;
+            }
+        });
+
+        function empezarTiempo() {
+            clearInterval(intervalo);
+            intervalo = setInterval(manejarTiempo, 10);
+        }
+        function pausarTiempo() {
+            clearInterval(intervalo);
+        }
+
+        function manejarTiempo(){
+            decimas++;
+            if(decimas>9){
+                decimasStr = decimas;
+            }
+            else{
+                decimasStr = "0"+decimas;
+            }
+            if (decimas > 99) {
+                segundos++;
+                decimas = 0;
+                decimasStr = "0"+decimas;
+            }
+
+            if (segundos > 9){
+                segundosStr = segundos;
+            }
+            else{
+                segundosStr = "0"+segundos;
+            }
+            if(segundos > 59){
+                minutos++;
+                segundos = 0;
+                segundosStr = "0"+segundos;
+            }
+
+            if(minutos>9){
+                minutosStr = minutos;
+            }
+            else{
+                minutosStr = "0"+minutos;
+            }
+        }
+
+        function crearParedes(){
+            paredes.push(new Cuadro(0,0,"pared","h",20));
+            paredes.push(new Cuadro(0,0,"pared","v",20));
+            paredes.push(new Cuadro(20,0,"pared","v",20));
+            paredes.push(new Cuadro(0,20,"pared","h",20));
+
+            paredes.push(new Cuadro(1,0,"pared","v",1));
+            paredes.push(new Cuadro(6,0,"pared","v",4));
+            paredes.push(new Cuadro(11,0,"pared","v",1));
+            paredes.push(new Cuadro(17,0,"pared","v",1));
+            paredes.push(new Cuadro(19,0,"pared","v",1));
+            
+            paredes.push(new Cuadro(1,1,"pared","h",2));
+            paredes.push(new Cuadro(2,1,"pared","v",2));
+            paredes.push(new Cuadro(4,1,"pared","v",1));
+            paredes.push(new Cuadro(4,1,"pared","h",1));
+            paredes.push(new Cuadro(5,1,"pared","v",2));
+            paredes.push(new Cuadro(7,1,"pared","v",1));
+            paredes.push(new Cuadro(8,1,"pared","h",2));
+            paredes.push(new Cuadro(9,1,"pared","v",2));
+            paredes.push(new Cuadro(10,1,"pared","v",3));
+            paredes.push(new Cuadro(11,1,"pared","h",2));
+            paredes.push(new Cuadro(13,1,"pared","v",4));
+            paredes.push(new Cuadro(14,1,"pared","h",2));
+            paredes.push(new Cuadro(16,1,"pared","v",1));
+            paredes.push(new Cuadro(18,1,"pared","v",3));
+            
+            paredes.push(new Cuadro(0,2,"pared","h",1));
+            paredes.push(new Cuadro(1,2,"pared","v",2));
+            paredes.push(new Cuadro(3,2,"pared","v",2));
+            paredes.push(new Cuadro(3,2,"pared","h",1));
+            paredes.push(new Cuadro(6,2,"pared","v",2));
+            paredes.push(new Cuadro(6,2,"pared","h",2));
+            paredes.push(new Cuadro(10,2,"pared","v",2));
+            paredes.push(new Cuadro(10,2,"pared","h",2));
+            paredes.push(new Cuadro(14,2,"pared","h",1));
+            paredes.push(new Cuadro(15,2,"pared","v",1));
+            paredes.push(new Cuadro(16,2,"pared","h",3));
+            paredes.push(new Cuadro(19,2,"pared","v",1));
+            
+            paredes.push(new Cuadro(4,3,"pared","h",1));
+            paredes.push(new Cuadro(4,3,"pared","v",4));
+            paredes.push(new Cuadro(7,3,"pared","h",2));
+            paredes.push(new Cuadro(8,3,"pared","v",3));
+            paredes.push(new Cuadro(11,3,"pared","h",2));
+            paredes.push(new Cuadro(14,3,"pared","h",3));
+            paredes.push(new Cuadro(14,3,"pared","v",2));
+            
+            paredes.push(new Cuadro(2,4,"pared","h",1));
+            paredes.push(new Cuadro(5,4,"pared","h",1));
+            paredes.push(new Cuadro(5,4,"pared","v",1));
+            paredes.push(new Cuadro(7,4,"pared","v",1));
+            paredes.push(new Cuadro(9,4,"pared","v",2));
+            paredes.push(new Cuadro(10,4,"pared","h",2));
+            paredes.push(new Cuadro(11,4,"pared","v",3));
+            paredes.push(new Cuadro(15,4,"pared","h",4));
+            paredes.push(new Cuadro(19,4,"pared","v",1));
+            
+            paredes.push(new Cuadro(0,5,"pared","h",2));
+            paredes.push(new Cuadro(2,5,"pared","v",1));
+            paredes.push(new Cuadro(3,5,"pared","v",1));
+            paredes.push(new Cuadro(5,5,"pared","h",2));
+            paredes.push(new Cuadro(9,5,"pared","h",1));
+            paredes.push(new Cuadro(12,5,"pared","h",1));
+            paredes.push(new Cuadro(12,5,"pared","v",1));
+            paredes.push(new Cuadro(14,5,"pared","h",4));
+            paredes.push(new Cuadro(15,5,"pared","v",2));
+            paredes.push(new Cuadro(18,5,"pared","v",2));
+            paredes.push(new Cuadro(19,5,"pared","h",1));
+            
+            paredes.push(new Cuadro(1,6,"pared","v",1));
+            paredes.push(new Cuadro(2,6,"pared","h",1));
+            paredes.push(new Cuadro(4,6,"pared","h",5));
+            paredes.push(new Cuadro(4,6,"pared","v",1));
+            paredes.push(new Cuadro(6,6,"pared","v",1));
+            paredes.push(new Cuadro(10,6,"pared","v",1));
+            paredes.push(new Cuadro(12,6,"pared","h",2));
+            paredes.push(new Cuadro(13,6,"pared","v",2));
+            paredes.push(new Cuadro(15,6,"pared","h",2));
+            paredes.push(new Cuadro(18,6,"pared","h",1));
+            
+            paredes.push(new Cuadro(1,7,"pared","h",2));
+            paredes.push(new Cuadro(3,7,"pared","v",2));
+            paredes.push(new Cuadro(5,7,"pared","h",1));
+            paredes.push(new Cuadro(5,7,"pared","v",2));
+            paredes.push(new Cuadro(7,7,"pared","h",1));
+            paredes.push(new Cuadro(7,7,"pared","v",2));
+            paredes.push(new Cuadro(9,7,"pared","h",3));
+            paredes.push(new Cuadro(9,7,"pared","v",1));
+            paredes.push(new Cuadro(12,7,"pared","v",2));
+            paredes.push(new Cuadro(12,7,"pared","v",2));
+            paredes.push(new Cuadro(14,7,"pared","h",1));
+            paredes.push(new Cuadro(16,7,"pared","h",2));
+            paredes.push(new Cuadro(16,7,"pared","v",2));
+            paredes.push(new Cuadro(19,7,"pared","v",1));
+            
+            paredes.push(new Cuadro(1,8,"pared","h",1));
+            paredes.push(new Cuadro(1,8,"pared","v",1));
+            paredes.push(new Cuadro(3,8,"pared","h",1));
+            paredes.push(new Cuadro(6,8,"pared","h",1));
+            paredes.push(new Cuadro(6,8,"pared","v",2));
+            paredes.push(new Cuadro(8,8,"pared","h",1));
+            paredes.push(new Cuadro(10,8,"pared","h",1));
+            paredes.push(new Cuadro(10,8,"pared","v",1));
+            paredes.push(new Cuadro(11,8,"pared","v",3));
+            paredes.push(new Cuadro(13,8,"pared","h",2));
+            paredes.push(new Cuadro(14,8,"pared","v",1));
+            paredes.push(new Cuadro(17,8,"pared","h",3));
+            
+            paredes.push(new Cuadro(0,9,"pared","h",1));
+            paredes.push(new Cuadro(3,9,"pared","h",2));
+            paredes.push(new Cuadro(2,9,"pared","v",4));
+            paredes.push(new Cuadro(4,9,"pared","v",1));
+            paredes.push(new Cuadro(7,9,"pared","h",3));
+            paredes.push(new Cuadro(12,9,"pared","h",1));
+            paredes.push(new Cuadro(13,9,"pared","v",1));
+            paredes.push(new Cuadro(14,9,"pared","h",3));
+            paredes.push(new Cuadro(17,9,"pared","v",2));
+            paredes.push(new Cuadro(18,9,"pared","h",1));
+            paredes.push(new Cuadro(18,9,"pared","v",3));
+            
+            paredes.push(new Cuadro(1,10,"pared","h",1));
+            paredes.push(new Cuadro(3,10,"pared","v",2));
+            paredes.push(new Cuadro(5,10,"pared","h",1));
+            paredes.push(new Cuadro(5,10,"pared","v",1));
+            paredes.push(new Cuadro(7,10,"pared","h",3));
+            paredes.push(new Cuadro(8,10,"pared","v",1));
+            paredes.push(new Cuadro(10,10,"pared","v",2));
+            paredes.push(new Cuadro(10,10,"pared","v",1));
+            paredes.push(new Cuadro(11,10,"pared","h",1));
+            paredes.push(new Cuadro(12,10,"pared","v",3));
+            paredes.push(new Cuadro(13,10,"pared","h",3));
+            paredes.push(new Cuadro(16,10,"pared","v",2));
+            paredes.push(new Cuadro(19,10,"pared","h",1));
+            
+            paredes.push(new Cuadro(1,11,"pared","v",2));
+            paredes.push(new Cuadro(3,11,"pared","h",2));
+            paredes.push(new Cuadro(6,11,"pared","h",1));
+            paredes.push(new Cuadro(7,11,"pared","v",2));
+            paredes.push(new Cuadro(9,11,"pared","v",2));
+            paredes.push(new Cuadro(12,11,"pared","h",3));
+            paredes.push(new Cuadro(15,11,"pared","v",1));
+            paredes.push(new Cuadro(17,11,"pared","h",2));
+            
+            paredes.push(new Cuadro(3,12,"pared","h",1));
+            paredes.push(new Cuadro(4,12,"pared","v",1));
+            paredes.push(new Cuadro(5,12,"pared","h",2));
+            paredes.push(new Cuadro(5,12,"pared","v",1));
+            paredes.push(new Cuadro(8,12,"pared","h",1));
+            paredes.push(new Cuadro(10,12,"pared","h",1));
+            paredes.push(new Cuadro(11,12,"pared","v",3));
+            paredes.push(new Cuadro(13,12,"pared","h",1));
+            paredes.push(new Cuadro(13,12,"pared","v",2));
+            paredes.push(new Cuadro(16,12,"pared","h",1));
+            paredes.push(new Cuadro(17,12,"pared","v",1));
+            paredes.push(new Cuadro(19,12,"pared","v",1));
+            
+            paredes.push(new Cuadro(0,13,"pared","h",1));
+            paredes.push(new Cuadro(2,13,"pared","h",2));
+            paredes.push(new Cuadro(3,13,"pared","v",2));
+            paredes.push(new Cuadro(4,13,"pared","h",1));
+            paredes.push(new Cuadro(6,13,"pared","v",1));
+            paredes.push(new Cuadro(7,13,"pared","h",3));
+            paredes.push(new Cuadro(11,13,"pared","h",1));
+            paredes.push(new Cuadro(14,13,"pared","h",5));
+            paredes.push(new Cuadro(15,13,"pared","v",3));
+            
+            paredes.push(new Cuadro(1,14,"pared","h",1));
+            paredes.push(new Cuadro(1,14,"pared","v",1));
+            paredes.push(new Cuadro(3,14,"pared","h",7));
+            paredes.push(new Cuadro(9,14,"pared","v",1));
+            paredes.push(new Cuadro(12,14,"pared","h",2));
+            paredes.push(new Cuadro(12,14,"pared","v",4));
+            paredes.push(new Cuadro(14,14,"pared","v",1));
+            paredes.push(new Cuadro(16,14,"pared","h",4));
+            paredes.push(new Cuadro(16,14,"pared","v",1));
+            paredes.push(new Cuadro(18,14,"pared","v",2));
+            
+            paredes.push(new Cuadro(1,15,"pared","h",2));
+            paredes.push(new Cuadro(4,15,"pared","h",3));
+            paredes.push(new Cuadro(4,15,"pared","v",2));
+            paredes.push(new Cuadro(5,15,"pared","v",1));
+            paredes.push(new Cuadro(7,15,"pared","v",3));
+            paredes.push(new Cuadro(8,15,"pared","h",1));
+            paredes.push(new Cuadro(8,15,"pared","v",1));
+            paredes.push(new Cuadro(10,15,"pared","h",1));
+            paredes.push(new Cuadro(10,15,"pared","v",2));
+            paredes.push(new Cuadro(13,15,"pared","h",1));
+            paredes.push(new Cuadro(13,15,"pared","v",2));
+            paredes.push(new Cuadro(17,15,"pared","v",2));
+            paredes.push(new Cuadro(19,15,"pared","v",1));
+            
+            paredes.push(new Cuadro(1,16,"pared","h",3));
+            paredes.push(new Cuadro(2,16,"pared","v",3));
+            paredes.push(new Cuadro(6,16,"pared","v",1));
+            paredes.push(new Cuadro(9,16,"pared","h",1));
+            paredes.push(new Cuadro(9,16,"pared","v",2));
+            paredes.push(new Cuadro(11,16,"pared","h",1));
+            paredes.push(new Cuadro(14,16,"pared","h",3));
+            paredes.push(new Cuadro(14,16,"pared","v",1));
+            paredes.push(new Cuadro(18,16,"pared","h",1));
+            
+            paredes.push(new Cuadro(0,17,"pared","h",1));
+            paredes.push(new Cuadro(3,17,"pared","v",1));
+            paredes.push(new Cuadro(4,17,"pared","h",2));
+            paredes.push(new Cuadro(7,17,"pared","h",2));
+            paredes.push(new Cuadro(10,17,"pared","h",1));
+            paredes.push(new Cuadro(11,17,"pared","v",1));
+            paredes.push(new Cuadro(14,17,"pared","h",1));
+            paredes.push(new Cuadro(16,17,"pared","v",1));
+            paredes.push(new Cuadro(17,17,"pared","h",2));
+            paredes.push(new Cuadro(18,17,"pared","v",1));
+            
+            paredes.push(new Cuadro(1,18,"pared","h",1));
+            paredes.push(new Cuadro(3,18,"pared","h",3));
+            paredes.push(new Cuadro(6,18,"pared","v",2));
+            paredes.push(new Cuadro(8,18,"pared","v",1));
+            paredes.push(new Cuadro(9,18,"pared","h",1));
+            paredes.push(new Cuadro(10,18,"pared","v",1));
+            paredes.push(new Cuadro(12,18,"pared","h",6));
+            paredes.push(new Cuadro(13,18,"pared","v",1));
+            paredes.push(new Cuadro(15,18,"pared","v",1));
+            paredes.push(new Cuadro(19,18,"pared","h",1));
+            paredes.push(new Cuadro(19,18,"pared","v",1));
+            
+            paredes.push(new Cuadro(0,19,"pared","h",1));
+            paredes.push(new Cuadro(2,19,"pared","h",3));
+            paredes.push(new Cuadro(6,19,"pared","h",4));
+            paredes.push(new Cuadro(6,19,"pared","v",1));
+            paredes.push(new Cuadro(11,19,"pared","h",1));
+            paredes.push(new Cuadro(12,19,"pared","v",1));
+            paredes.push(new Cuadro(14,19,"pared","v",1));
+            paredes.push(new Cuadro(16,19,"pared","h",3));
+        }
+</script>
+</body>
+</html>
